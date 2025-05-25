@@ -1,0 +1,61 @@
+# Byte-compiled / optimized / DLL files
+
+**pycache**/
+\*.py\[cod]
+\*\$py.class
+
+# Virtual environments
+
+.venv/
+venv/
+.env
+
+# Poetry
+
+# (poetry.lock should be tracked)
+
+# DVC
+
+.dvc/
+
+# DuckDB
+
+\*.duckdb
+*.duckdb
+# Data folders (raw/interim/processed) handled by DVC or external storage
+
+data/raw/
+data/raw2/
+data/interim/
+data/processed/
+
+# MLflow
+
+mlruns/
+
+# Logs
+
+logs/
+\*.log
+
+# IDEs and editors
+
+.vscode/
+.idea/
+
+# OS-specific files
+
+.DS\_Store
+Thumbs.db
+
+# Testing
+
+.pytest\_cache/
+
+# Swap files
+
+\*.swp
+
+
+
+data/*

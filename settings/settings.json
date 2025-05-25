@@ -1,0 +1,26 @@
+{
+  "seed": 42,
+  "sensors": ["accelerometer", "gyroscope"],
+  "ingest": {
+    "raw_path": "data/raw",
+    "duckdb_dir": "data/duckdb",
+    "max_subjects": 3,
+    "sensors": ["accelerometer", "gyroscope"]
+  },
+
+  "windows": {
+    "window_ms": 5000,
+    "overlap_pct": 0.5
+  },
+
+  "features": {
+    "statistics": ["mean", "std", "rms", "min", "max"],
+    "frequency":  ["total_power", "dom_freq", "spect_entropy"],
+    "pca": null
+  },
+
+  "models": [
+    { "name": "svm_rbf",  "type": "svm", "params": { "C": 10,  "gamma": "scale" } },
+    { "name": "rf_200",   "type": "random_forest", "params": { "n_estimators": 200 } }
+  ]
+}
