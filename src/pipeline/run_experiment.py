@@ -1,34 +1,18 @@
 from __future__ import annotations
 
+import importlib
 import argparse, json, logging, sys
 from pathlib import Path
 from time import perf_counter
+
+PROJ_ROOT = Path(__file__).parents[2] 
+sys.path.insert(0, str(PROJ_ROOT / "src"))
 
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
 
-# --- garante que diretório-raiz esteja no PYTHONPATH -------------
-PROJECT_ROOT = Path(__file__).resolve().parents[2]  # <root>/src/pipeline/..
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
 
-from src.utils.timer import step_timer                    
-from src.ingest.make_duckdb import run as run_ingest      
-
-# --------------------------- CLI -------------------------------
-parser = argparse.ArgumentParser(description="Pipeline HMOG")
-parser.add_argument(
-    "--config", default="settings/settings.json",
-    help="Arquivo JSON com a configuração do experimento"
-)
-parser.add_argument(
-    "--stages", default="ingest",
-    help="Etapas a executar (ex.: ingest,windows)"
-)
-args = parser.parse_args()
-
-# ------------------------- logging -----------------------------
 logging.basicConfig(
     level=logging.INFO,
     handlers=[RichHandler(rich_tracebacks=True)],
@@ -36,53 +20,63 @@ logging.basicConfig(
 )
 log = logging.getLogger("pipeline")
 
-# ---------------------- carrega config -------------------------
-cfg_path = Path(args.config).resolve()
-if not cfg_path.exists():
-    log.error(f"Config não encontrada: {cfg_path}")
-    sys.exit(1)
+# cfg_path = Path(args.config).resolve()
+# if not cfg_path.exists():
+#     log.error(f"Config não encontrada: {cfg_path}")
+#     sys.exit(1)
 
-CFG = json.loads(cfg_path.read_text())
-log.info(f"⚙️  Config carregada de {cfg_path}")
+# CFG = json.loads(cfg_path.read_text())
+# log.info(f"⚙️  Config carregada de {cfg_path}")
 
-# ------------- mapeia etapas → função --------------------------
-STAGE_FUNCS = {
-    "ingest": run_ingest,
-    # futuros estágios:
-    # "windows": run_windows,
-    # "features": run_features,
-    # "models": run_models,
+config = {
+    "seed": 42,
+    "sensors": ["accelerometer", "gyroscope"],
+
+    "pipeline_steps": [
+        "ingest.ingest_step.IngestStep",
+        "windows.slice_step.SliceStep",
+        "features.features_step.FeatureExtractionStep",
+        "models.svm_step.SvmStep"
+    ],
+    "IngestStep": {
+        "raw_path": "data/raw",
+        "duckdb_dir": "data/duckdb",
+        "max_subjects": 1,
+    },
+    "SliceStep": {
+        "window_size_ms": 1000,
+        "overlap_pct": 0.5,
+        "out_dir": "data/windows",
+    },
+    "FeatureExtractionStep": {
+        "out_dir": "data/features"
+    },
+    "SvmStep": {
+        "out_dir": "data/models/svm",
+        "kernel": "linear",
+        "C": 1.0,
+    }
 }
 
-stages_to_run = [s.strip() for s in args.stages.split(",") if s.strip()]
-invalid = [s for s in stages_to_run if s not in STAGE_FUNCS]
-if invalid:
-    log.error(f"Etapa(s) desconhecida(s): {', '.join(invalid)}")
-    sys.exit(1)
+for class_path in config["pipeline_steps"]:
+    module_path, class_name = class_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    step_cls = getattr(module, class_name)
+    step = step_cls()
+    context = config
+    step.execute(context)
 
-# --------------------- execução -------------------------------
-durations: dict[str, float] = {}
-console = Console()
 
-for stage in stages_to_run:
-    func = STAGE_FUNCS[stage]
-    subcfg = CFG.get(stage, {})
-    subcfg["seed"] = CFG.get("seed", 42)
 
-    console.rule(f"[bold cyan]{stage.upper()}[/]")
 
-    with step_timer(stage, logger=log) as timer:
-        artifact = func(subcfg, logger=log)
-        durations[stage] = timer()   # timer() devolve segundos
 
-    if artifact:
-        log.info(f"   └─ artefato: {artifact}")
+
 
 # --------------------- resumo -------------------------------
-table = Table(title="Resumo do experimento")
-table.add_column("Etapa")
-table.add_column("Duração (s)", justify="right")
-for s in stages_to_run:
-    table.add_row(s, f"{durations[s]:.1f}")
-console.print(table)
-console.print("[bold green]✅  Pipeline finalizado[/]")
+# table = Table(title="Resumo do experimento")
+# table.add_column("Etapa")
+# table.add_column("Duração (s)", justify="right")
+# for s in stages_to_run:
+#     table.add_row(s, f"{durations[s]:.1f}")
+# console.print(table)
+# console.print("[bold green]✅  Pipeline finalizado[/]")
