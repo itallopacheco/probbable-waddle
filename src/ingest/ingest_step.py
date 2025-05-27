@@ -21,7 +21,7 @@ from utils.utils import get_db_path
 
 
 class IngestStep(PipelineStep):
-    def execute(self, context: dict) -> dict:  # noqa: D401
+    def execute(self, context: dict) -> dict:
         log = logging.getLogger("ingest")
         log.info("📥 Iniciando ingestão de dados…")
 
@@ -103,14 +103,9 @@ class IngestStep(PipelineStep):
 
         log.info("🎉 DuckDB pronto: %s (%.1f s no total)", db_path, perf_counter() - t0)
 
-        # 7) Limpa diretório temporário
         shutil.rmtree(parquet_dir, ignore_errors=True)
         return context
 
-
-# ---------------------------------------------------------------------------
-# Helper (exemplo) para descobrir IDs de sujeitos se precisar fora da classe
-# ---------------------------------------------------------------------------
 
 def discover_subject_ids(raw_dir: Path) -> list[str]:
     """Retorna todos os diretórios <subject_id> presentes em `raw_dir`."""
