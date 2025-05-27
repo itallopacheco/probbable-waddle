@@ -30,18 +30,20 @@ log = logging.getLogger("pipeline")
 
 config = {
     "seed": 42,
-    "sensors": ["accelerometer", "gyroscope"],
+    "sensors": ["accelerometer"],
+    "scenarios": [
+        {"name": "acc", "sensors": ["accelerometer"]},
+        {"name": "gyro", "sensors": ["gyroscope"]},
+    ],
 
     "pipeline_steps": [
         "ingest.ingest_step.IngestStep",
-        "windows.slice_step.SliceStep",
-        "features.features_step.FeatureExtractionStep",
-        "models.svm_step.SvmStep"
+        # "windows.slice_step.SliceStep",
+        # "features.features_step.FeatureExtractionStep"
     ],
     "IngestStep": {
         "raw_path": "data/raw",
-        "duckdb_dir": "data/duckdb",
-        "max_subjects": 1,
+        "duckdb_dir": "data/duckdb"
     },
     "SliceStep": {
         "window_size_ms": 1000,
@@ -51,8 +53,8 @@ config = {
     "FeatureExtractionStep": {
         "out_dir": "data/features"
     },
-    "SvmStep": {
-        "out_dir": "data/models/svm",
+    "TrainVerificationStep": {
+        "out_dir": "data/results/verification",
         "kernel": "linear",
         "C": 1.0,
     }
