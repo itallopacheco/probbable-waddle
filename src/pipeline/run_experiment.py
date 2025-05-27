@@ -30,7 +30,8 @@ log = logging.getLogger("pipeline")
 
 config = {
     "seed": 42,
-    "sensors": ["accelerometer"],
+    #"num_subjects": 100,
+    "sensors": ["onefingertouchevent", "scrollevent", "accelerometer", "gyroscope"],
     "scenarios": [
         {"name": "acc", "sensors": ["accelerometer"]},
         {"name": "gyro", "sensors": ["gyroscope"]},
@@ -38,9 +39,10 @@ config = {
 
     "pipeline_steps": [
         "ingest.ingest_step.IngestStep",
-        # "windows.slice_step.SliceStep",
-        # "features.features_step.FeatureExtractionStep"
+        "windows.slice_step.SliceStep",
+        #"features.features_step.FeatureExtractionStep"
     ],
+
     "IngestStep": {
         "raw_path": "data/raw",
         "duckdb_dir": "data/duckdb"
@@ -59,14 +61,14 @@ config = {
         "C": 1.0,
     }
 }
+context = config
 
 for class_path in config["pipeline_steps"]:
     module_path, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     step_cls = getattr(module, class_name)
     step = step_cls()
-    context = config
-    step.execute(context)
+    context = step.execute(context)
 
 
 

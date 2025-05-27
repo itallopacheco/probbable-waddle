@@ -29,6 +29,7 @@ class IngestStep(PipelineStep):
         duckdb_dir = Path(context["IngestStep"]["duckdb_dir"])
         duckdb_dir.mkdir(parents=True, exist_ok=True)
         max_workers = context.get("max_workers", os.cpu_count())
+        seed = context.get("seed", 42)
 
         sensors = context.get("sensors", [])
         sensors.append("activity")
@@ -38,8 +39,13 @@ class IngestStep(PipelineStep):
             log.error("❌ Nenhum dado encontrado em %s", raw_dir)
             return context
 
-        subjects = all_subjects
-        db_name = "hmog_all.duckdb"
+        num_subjects = context.get('num_subjects')
+        if num_subjects is not None and isinstance(num_subjects, int):
+            subjects = _select_subjects(raw_dir, num_subjects, seed)
+        else:
+            subjects = all_subjects
+
+        db_name = f"hmog_{num_subjects}.duckdb"
         db_path = duckdb_dir / db_name
         context["db_path"] = str(db_path)
 
@@ -80,10 +86,6 @@ class IngestStep(PipelineStep):
             
             pq_path = parquet_dir / (csv_path.stem.lower() + "__" + csv_path.parents[1].name + "__" + csv_path.parents[0].name.split("_session_")[1] + ".parquet")
 
-            for c, dt in df.dtypes.items():
-                if dt.name in ("Int64", "UInt64"):
-                    df[c] = df[c].astype("int64")
-
             df.to_parquet(pq_path, index=False)
             return pq_path
 
@@ -97,8 +99,10 @@ class IngestStep(PipelineStep):
         con = duckdb.connect(str(db_path))
         for sensor in sensors:
             pattern = str(parquet_dir / f"{sensor}__*.parquet")
-            con.execute(f"CREATE TABLE {sensor} AS SELECT * FROM read_parquet('{pattern}')")
-            log.info("Tabela '%s' pronta (%d linhas)", sensor, con.execute(f"SELECT COUNT(*) FROM {sensor}").fetchone()[0])
+            con.execute(f"CREATE TABLE {sensor} AS SELECT * FROM read_parquet('{pattern}', union_by_name=True)")
+
+            cnt = con.execute(f"SELECT COUNT(*) FROM {sensor}").fetchone()[0]
+            log.info("Tabela '%s' pronta (%d linhas)", sensor, cnt)
         con.close()
 
         log.info("🎉 DuckDB pronto: %s (%.1f s no total)", db_path, perf_counter() - t0)
@@ -111,6 +115,13 @@ def discover_subject_ids(raw_dir: Path) -> list[str]:
     """Retorna todos os diretórios <subject_id> presentes em `raw_dir`."""
     return sorted([p.name for p in raw_dir.iterdir() if p.is_dir()])
 
+
+def _select_subjects(raw_root: Path, n: int, seed: int) -> List[str]:
+    subjects = [p.name for p in raw_root.iterdir() if p.is_dir()]
+    if n > len(subjects):
+        raise ValueError(f"num_subjects={n} > {len(subjects)} disponíveis")
+    random.seed(seed)
+    return sorted(random.sample(subjects, n))
 
 
 HEADER_MAPS = {
@@ -174,7 +185,7 @@ HEADER_MAPS = {
         'key_id',
         'phone_orientation',
     ],
-    'onefingertouch': [
+    'onefingertouchevent': [
         'time_sys',
         'time_rel',
         'activity_id',
@@ -248,7 +259,7 @@ ABSOLUTE_TIME_COLS = {
     'magnetometer':  ['time_sys'],
     'touchevent':    ['time_sys'],
     'keypressevent': ['time_sys'],
-    'onefingertouch':['time_sys'],
+    'onefingertouchevent':['time_sys'],
     'pinchevent':    ['time_sys'],
     'scrollevent':   ['time_sys', 'time_begin', 'time_current'],
     'strokeevent':   ['time_sys', 'time_begin', 'time_end'],
@@ -260,7 +271,7 @@ RELATIVE_TIME_COLS = {
     'magnetometer':  ['time_rel'],
     'touchevent':    ['time_rel'],
     'keypressevent': ['time_rel'],
-    'onefingertouch':['time_rel'],
+    'onefingertouchevent':['time_rel'],
     'pinchevent':    ['time_rel'],
     'activity':      ['relative_start_time', 'relative_end_time'],
 }
