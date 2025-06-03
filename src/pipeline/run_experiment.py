@@ -29,19 +29,32 @@ log = logging.getLogger("pipeline")
 # log.info(f"⚙️  Config carregada de {cfg_path}")
 
 config = {
+    "name": "experiment-03",
     "seed": 42,
-    "sensors": ["accelerometer", "gyroscope"],
+    "raw_data_path": "data/raw",
+    "output_dir": "results",
+    #"num_subjects": 2,
+    "num_subjects_train": 1,
+    "sensors": ["accelerometer", "gyroscope", "multimodal"],
+    "window_size_ms": 1000,
+    "overlap_pct": 0.5,
+    "max_samples": 10_000,
+    
+    "scenarios": [
+        {"name": "acc", "sensors": ["accelerometer"]},
+        {"name": "gyro", "sensors": ["gyroscope"]},
+    ],
 
     "pipeline_steps": [
-        "ingest.ingest_step.IngestStep",
-        "windows.slice_step.SliceStep",
-        "features.features_step.FeatureExtractionStep",
-        "models.svm_step.SvmStep"
+        # "steps.ingest_step.IngestStep",
+        # "steps.slice_step.SliceStep",
+        # "steps.features_step.FeatureExtractionStep",
+        "steps.train_step.TrainStep",
     ],
+
     "IngestStep": {
         "raw_path": "data/raw",
-        "duckdb_dir": "data/duckdb",
-        "max_subjects": 1,
+        "duckdb_dir": "data/duckdb"
     },
     "SliceStep": {
         "window_size_ms": 1000,
@@ -51,20 +64,24 @@ config = {
     "FeatureExtractionStep": {
         "out_dir": "data/features"
     },
-    "SvmStep": {
-        "out_dir": "data/models/svm",
+    "TrainVerificationStep": {
+        "out_dir": "data/results/verification",
         "kernel": "linear",
         "C": 1.0,
     }
 }
+context = config
+experiment_name = config["name"]
+experiment_dir = Path(config["output_dir"]) / experiment_name
+experiment_dir.mkdir(parents=True, exist_ok=True)
+context["experiment_dir"] = experiment_dir
 
 for class_path in config["pipeline_steps"]:
     module_path, class_name = class_path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     step_cls = getattr(module, class_name)
     step = step_cls()
-    context = config
-    step.execute(context)
+    context = step.execute(context)
 
 
 
